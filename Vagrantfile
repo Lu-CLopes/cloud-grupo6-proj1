@@ -1,5 +1,7 @@
 Vagrant.configure("2") do |config|
 	is_arm = RUBY_PLATFORM.include?("arm64") || RUBY_PLATFORM.include?("aarch64")
+
+	# VM 1 - Frontend
 	config.vm.define "frontend" do |client|
 		client.vm.box = "bento/ubuntu-22.04" if is_arm
 		client.vm.box = "ubuntu/focal64" if !is_arm
@@ -21,9 +23,11 @@ Vagrant.configure("2") do |config|
 			sudo apt-get -y update
 			sudo apt-get -y install net-tools
 
+			# Forward de ip
 			echo "net.ipv4.ip_forward=1" | sudo tee /etc/sysctl.d/99-router.conf
 			sudo sysctl -p /etc/sysctl.d/99-router.conf
 
+			# Regras para o forward de ip e habilitação de persistência das regras
 			sudo iptables -t nat -A POSTROUTING -s 10.20.30.0/24 -o enp0s3 -j MASQUERADE
 			echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
             echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
@@ -38,8 +42,8 @@ Vagrant.configure("2") do |config|
 		backend.vm.box_architecture = "arm64" if is_arm
 		backend.vm.hostname = "backend"
 
-		backend.vm.network "private_network", ip: "10.0.1.2", netmask: "255.255.255.0", virtualbox__intnet: "intnet_interna"
-
+		backend.vm.network "private_network", ip: "10.20.30.2", netmask: "255.255.255.0", virtualbox__intnet: "intnet1"
+		
 		backend.vm.provider "virtualbox" do |vb|
 			#vb.customize ["modifyvm", :id, "--appendconfig", "nopti nospectre_v2 nospectre_v1 irqpoll"] if !is_arm
 			#vb.customize ["storagectl", :id, "--name", "SATA Controller", "--hostiocache", "on"] if !is_arm
@@ -65,18 +69,23 @@ Vagrant.configure("2") do |config|
 			
 			# Cliente MySQL para comunicação/testes com o banco
 			sudo apt-get -y install mysql-client
+
+			# Setando única conexão de internet através do frontend
+			sudo ip route del default via 10.0.2.2 || true
+            sudo ip route add default via 10.20.30.1
+            sudo rm -f /etc/resolv.conf
+            echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
 		SHELL
 	end
 	
 	# VM 3 - Banco de Dados (MySQL)
-
 	config.vm.define "db" do |db|
 		db.vm.box = "bento/ubuntu-22.04" if is_arm
 		db.vm.box = "ubuntu/focal64" if !is_arm
 		db.vm.box_architecture = "arm64" if is_arm
 		db.vm.hostname = "db"
 
-		db.vm.network "private_network", ip: "10.0.1.3", netmask: "255.255.255.0", virtualbox__intnet: "intnet_interna"
+		db.vm.network "private_network", ip: "10.0.1.3", netmask: "255.255.255.0", virtualbox__intnet: "intnet1"
 
 		db.vm.provider "virtualbox" do |vb|
 			#vb.customize ["modifyvm", :id, "--appendconfig", "nopti nospectre_v2 nospectre_v1 irqpoll"] if !is_arm
@@ -104,7 +113,7 @@ Vagrant.configure("2") do |config|
 			sudo mysql -e "CREATE DATABASE IF NOT EXISTS crossfit_tracker;"
 			sudo mysql -e "CREATE USER IF NOT EXISTS 'crossfit_app' IDENTIFIED BY 'password';"
 			sudo mysql -e "GRANT ALL PRIVILEGES ON crossfit_tracker.* TO 'crossfit_app';"
-			sudo mysql -e "FLUSH PRIVILEGES;" #Alterações feitas por fora, i.g. scripts, tem efeito no banco de dados
+			sudo mysql -e "FLUSH PRIVILEGES;" #Alterações feitas por fora, e.g. scripts, tem efeito no banco de dados
 
 			sudo mysql crossfit_tracker -e "
 				CREATE TABLE IF NOT EXISTS users (
@@ -145,6 +154,12 @@ Vagrant.configure("2") do |config|
 					FOREIGN KEY (user_id) REFERENCES users(id)
 				);
 			"
+
+			# Setando única conexão de internet através do frontend
+			sudo ip route del default via 10.0.2.2 || true
+            sudo ip route add default via 10.20.30.1
+            sudo rm -f /etc/resolv.conf
+            echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
 		SHELL
 	end
 end

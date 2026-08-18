@@ -30,7 +30,44 @@ Vagrant.configure("2") do |config|
             sudo DEBIAN_FRONTEND=noninteractive apt-get -y install iptables-persistent
 		SHELL
 	end
+	
+	# VM 2 - APP Server / Backend
+	config.vm.define "backend" do |backend|
+		backend.vm.box = "bento/ubuntu-22.04" if is_arm
+		backend.vm.box = "ubuntu/focal64" if !is_arm
+		backend.vm.box_architecture = "arm64" if is_arm
+		backend.vm.hostname = "backend"
 
+		backend.vm.network "private_network", ip: "10.0.1.2", netmask: "255.255.255.0", virtualbox__intnet: "intnet_interna"
+
+		backend.vm.provider "virtualbox" do |vb|
+			#vb.customize ["modifyvm", :id, "--appendconfig", "nopti nospectre_v2 nospectre_v1 irqpoll"] if !is_arm
+			#vb.customize ["storagectl", :id, "--name", "SATA Controller", "--hostiocache", "on"] if !is_arm
+			#vb.customize ["modifyvm", :id, "--ioapic", "on"] if !is_arm
+			#vb.customize ["modifyvm", :id, "--paravirt-provider", "hyperv"] if !is_arm
+			vb.gui = !is_arm
+			vb.memory = "1024"
+			vb.cpus = 1
+			vb.name = "backend"
+		end
+
+		backend.vm.provision "shell", inline: <<-SHELL
+			sudo apt-get -y update
+			
+			# Ferramentas de rede
+			sudo apt-get -y install net-tools
+			sudo apt-get -y install telnet
+			sudo apt-get -y install curl
+			
+			# Node.js e npm para a API
+			sudo apt-get -y install nodejs
+			sudo apt-get -y install npm
+			
+			# Cliente MySQL para comunicação/testes com o banco
+			sudo apt-get -y install mysql-client
+		SHELL
+	end
+	
 	# VM 3 - Banco de Dados (MySQL)
 
 	config.vm.define "db" do |db|
@@ -60,7 +97,7 @@ Vagrant.configure("2") do |config|
 			sudo apt-get -y install mysql-server
 
 			# Permite conexões vindas da rede interna (não só localhost)
-			sudo sed -i "s/^bind-address.*/bind-address = 10.0.1.30/" /etc/mysql/mysql.conf.d/mysqld.cnf
+			sudo sed -i "s/^bind-address.*/bind-address = 10.0.1.3/" /etc/mysql/mysql.conf.d/mysqld.cnf
 			sudo systemctl restart mysql
 
 			# Cria banco, usuário de aplicação e schema inicial

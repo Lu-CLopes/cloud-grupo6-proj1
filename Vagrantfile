@@ -85,7 +85,7 @@ Vagrant.configure("2") do |config|
 		db.vm.box_architecture = "arm64" if is_arm
 		db.vm.hostname = "db"
 
-		db.vm.network "private_network", ip: "10.0.1.3", netmask: "255.255.255.0", virtualbox__intnet: "intnet1"
+		db.vm.network "private_network", ip: "10.20.30.3", netmask: "255.255.255.0", virtualbox__intnet: "intnet1"
 
 		db.vm.provider "virtualbox" do |vb|
 			#vb.customize ["modifyvm", :id, "--appendconfig", "nopti nospectre_v2 nospectre_v1 irqpoll"] if !is_arm
@@ -106,7 +106,7 @@ Vagrant.configure("2") do |config|
 			sudo apt-get -y install mysql-server
 
 			# Permite conexões vindas da rede interna (não só localhost)
-			sudo sed -i "s/^bind-address.*/bind-address = 10.0.1.3/" /etc/mysql/mysql.conf.d/mysqld.cnf
+			sudo sed -i "s/^bind-address.*/bind-address = 10.20.30.3/" /etc/mysql/mysql.conf.d/mysqld.cnf
 			sudo systemctl restart mysql
 
 			# Cria banco, usuário de aplicação e schema inicial

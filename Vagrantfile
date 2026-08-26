@@ -70,6 +70,9 @@ Vagrant.configure("2") do |config|
 			# Cliente MySQL para comunicação/testes com o banco
 			sudo apt-get -y install mysql-client
 
+			# Instala as dependências do app-server a partir da pasta sincronizada
+			cd /vagrant/app-server && npm install
+
 			# Setando única conexão de internet através do frontend
 			sudo ip route del default via 10.0.2.2 || true
             sudo ip route add default via 10.20.30.1
@@ -109,51 +112,14 @@ Vagrant.configure("2") do |config|
 			sudo sed -i "s/^bind-address.*/bind-address = 10.20.30.3/" /etc/mysql/mysql.conf.d/mysqld.cnf
 			sudo systemctl restart mysql
 
-			# Cria banco, usuário de aplicação e schema inicial
+			# Cria banco, usuário de aplicação 
 			sudo mysql -e "CREATE DATABASE IF NOT EXISTS crossfit_tracker;"
 			sudo mysql -e "CREATE USER IF NOT EXISTS 'crossfit_app' IDENTIFIED BY 'password';"
 			sudo mysql -e "GRANT ALL PRIVILEGES ON crossfit_tracker.* TO 'crossfit_app';"
 			sudo mysql -e "FLUSH PRIVILEGES;" #Alterações feitas por fora, e.g. scripts, tem efeito no banco de dados
 
-			sudo mysql crossfit_tracker -e "
-				CREATE TABLE IF NOT EXISTS users (
-					id INT AUTO_INCREMENT PRIMARY KEY,
-					name VARCHAR(100) NOT NULL,
-					email VARCHAR(150) NOT NULL UNIQUE,
-					password_hash VARCHAR(255) NOT NULL,
-					created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-				);
-
-				CREATE TABLE IF NOT EXISTS wods (
-					id INT AUTO_INCREMENT PRIMARY KEY,
-					user_id INT NOT NULL,
-					name VARCHAR(150) NOT NULL,
-					date DATE NOT NULL,
-					notes TEXT,
-					created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-					FOREIGN KEY (user_id) REFERENCES users(id)
-				);
-
-				CREATE TABLE IF NOT EXISTS exercise_entries (
-					id INT AUTO_INCREMENT PRIMARY KEY,
-					wod_id INT NOT NULL,
-					exercise_name VARCHAR(100) NOT NULL,
-					weight DECIMAL(6,2),
-					reps INT,
-					sets INT,
-					created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-					FOREIGN KEY (wod_id) REFERENCES wods(id)
-				);
-
-				CREATE TABLE IF NOT EXISTS personal_records (
-					id INT AUTO_INCREMENT PRIMARY KEY,
-					user_id INT NOT NULL,
-					exercise_name VARCHAR(100) NOT NULL,
-					best_weight DECIMAL(6,2) NOT NULL,
-					achieved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-					FOREIGN KEY (user_id) REFERENCES users(id)
-				);
-			"
+			# Criação tabelas de dados
+			sudo mysql crossfit_tracker < /vagrant/database/schema.sql
 
 			# Setando única conexão de internet através do frontend
 			sudo ip route del default via 10.0.2.2 || true

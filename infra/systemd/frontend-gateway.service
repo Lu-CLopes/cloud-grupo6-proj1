@@ -1,0 +1,14 @@
+[Unit]
+Description=CrossFit Tracker - Front-End Gateway (VM frontend)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/vagrant/frontend-gateway
+EnvironmentFile=/vagrant/frontend-gateway/.env
+ExecStart=/usr/bin/node /vagrant/frontend-gateway/server.js
+Restart=on-failure
+User=vagrant
+
+[Install]
+WantedBy=multi-user.target

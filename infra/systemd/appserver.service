@@ -1,0 +1,14 @@
+[Unit]
+Description=CrossFit Tracker - App Server (VM backend)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/vagrant/app-server
+EnvironmentFile=/vagrant/app-server/.env
+ExecStart=/usr/bin/node /vagrant/app-server/server.js
+Restart=on-failure
+User=vagrant
+
+[Install]
+WantedBy=multi-user.target

@@ -32,6 +32,24 @@ Vagrant.configure("2") do |config|
 			echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
             echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
             sudo DEBIAN_FRONTEND=noninteractive apt-get -y install iptables-persistent
+
+			# Node.js (usado pelo gateway)
+			sudo apt-get -y install curl
+			curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+			sudo apt-get -y install nodejs
+			node -v && npm -v
+
+			# Instala as dependências do gateway a partir da pasta sincronizada
+			cd /vagrant/frontend-gateway && npm install
+
+			# Garante que existe um .env 
+			[ -f /vagrant/frontend-gateway/.env ] || cp /vagrant/frontend-gateway/.env.example /vagrant/frontend-gateway/.env
+
+			# Sobe o gateway como serviço, pra já ficar rodando após o "vagrant up"
+			sudo cp /vagrant/infra/systemd/frontend-gateway.service /etc/systemd/system/frontend-gateway.service
+			sudo systemctl daemon-reload
+			sudo systemctl enable frontend-gateway
+			sudo systemctl restart frontend-gateway
 		SHELL
 	end
 	

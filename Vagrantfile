@@ -9,6 +9,9 @@ Vagrant.configure("2") do |config|
 		client.vm.hostname = "frontend"
 		#client.vm.network "forwarded_port", guest: 22, host: "2232"
 		client.vm.network "private_network", ip: "10.20.30.1",netmask: "255.255.255.0", virtualbox__intnet: "intnet1"
+		# Expoe o gateway (VM1) para a maquina fisica, pra o app mobile (Expo)
+		# conseguir alcancar a API durante o desenvolvimento/teste.
+		client.vm.network "forwarded_port", guest: 3000, host: 3000
 		client.vm.provider "virtualbox" do |vb|
 			#vb.customize ["modifyvm", :id, "--appendconfig", "nopti nospectre_v2 nospectre_v1 irqpoll"] if !is_arm
 			#vb.customize ["storagectl", :id, "--name", "SATA Controller", "--hostiocache", "on"] if !is_arm
@@ -27,8 +30,11 @@ Vagrant.configure("2") do |config|
 			echo "net.ipv4.ip_forward=1" | sudo tee /etc/sysctl.d/99-router.conf
 			sudo sysctl -p /etc/sysctl.d/99-router.conf
 
-			# Regras para o forward de ip e habilitação de persistência das regras
-			sudo iptables -t nat -A POSTROUTING -s 10.20.30.0/24 -o enp0s3 -j MASQUERADE
+			# Regras para o forward de ip e habilitação de persistência das regras.
+			# O nome da interface de saída (NAT) varia conforme a imagem da box
+			# (enpXsY em algumas, eth0 em outras) — descobre em vez de fixar.
+			WAN_IF=$(ip route | awk '/^default/ {print $5; exit}')
+			sudo iptables -t nat -A POSTROUTING -s 10.20.30.0/24 -o "$WAN_IF" -j MASQUERADE
 			echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
             echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
             sudo DEBIAN_FRONTEND=noninteractive apt-get -y install iptables-persistent
@@ -81,15 +87,31 @@ Vagrant.configure("2") do |config|
 			sudo apt-get -y install telnet
 			sudo apt-get -y install curl
 			
-			# Node.js e npm para a API
+			# Remove qualquer nodejs/npm antigo do apt do Ubuntu antes de trocar
+			# pela fonte NodeSource — o pacote "npm" do Ubuntu prende o nodejs
+			# numa versao antiga via dependencia, e os dois lados coexistindo
+			# deixa a instalacao pela metade (nodejs velho, sem npm nenhum).
+			sudo apt-get -y remove nodejs npm 2>/dev/null || true
+			sudo apt-get -y autoremove 2>/dev/null || true
+
+			# Node.js para a API — mesma fonte usada na VM frontend, pra garantir
+			# uma versao atual (o pacote "nodejs" do apt do Ubuntu 22.04 e uma
+			# versao antiga demais, incompativel com dependencias como o mysql2).
+			curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 			sudo apt-get -y install nodejs
-			sudo apt-get -y install npm
+			node -v && npm -v
 			
 			# Cliente MySQL para comunicação/testes com o banco
 			sudo apt-get -y install mysql-client
 
 			# Instala as dependências do app-server a partir da pasta sincronizada
 			cd /vagrant/app-server && npm install
+
+			# Sobe a API como serviço, pra já ficar rodando após o "vagrant up"
+			sudo cp /vagrant/infra/systemd/appserver.service /etc/systemd/system/appserver.service
+			sudo systemctl daemon-reload
+			sudo systemctl enable appserver
+			sudo systemctl restart appserver
 
 			# Setando única conexão de internet através do frontend
 			sudo ip route del default via 10.0.2.2 || true

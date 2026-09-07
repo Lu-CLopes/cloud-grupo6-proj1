@@ -4,11 +4,15 @@
 
 import * as SecureStore from 'expo-secure-store';
 
-// Trocar pelo IP real da VM frontend quando for testar em dispositivo físico
-// na mesma rede das VMs (ver Vagrantfile). Como a rede interna (intnet1) não
-// é alcançável direto do host/celular sem um forwarded_port configurado na
-// VM frontend, confirme com o time como o acesso externo vai ser exposto.
-const API_BASE_URL = 'http://10.20.30.1:3000/api';
+// A rede interna das VMs (intnet1, 10.20.30.0/24) não é alcançável direto
+// do host/celular. O Vagrantfile encaminha a porta 3000 da VM frontend
+// (gateway) para a porta 3000 da máquina física rodando o `vagrant up`.
+//
+// Usa o IP do Mac na LAN — funciona no simulador, no emulador e no
+// celular físico (Expo Go), desde que todos estejam na mesma Wi-Fi.
+// Se mudar de rede, atualize aqui (pegue o IP atual com `ipconfig getifaddr en0`).
+const HOST = '192.168.68.53';
+const API_BASE_URL = `http://${HOST}:3000/api`;
 
 const TOKEN_KEY = 'crossfit_auth_token';
 

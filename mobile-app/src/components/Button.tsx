@@ -18,6 +18,7 @@ interface ButtonProps {
     disabled?: boolean;
     style?: ViewStyle;
     icon?: keyof typeof Ionicons.glyphMap;
+    emoji?: string;
     fullWidth?: boolean;
 }
 
@@ -29,6 +30,7 @@ export default function Button({
     disabled = false,
     style,
     icon,
+    emoji,
     fullWidth = true,
 }: ButtonProps) {
     const isDisabled = disabled || loading;
@@ -93,6 +95,7 @@ export default function Button({
                             style={styles.icon}
                         />
                     )}
+                    {emoji && <Text style={styles.icon}>{emoji}</Text>}
                     <Text style={[styles.label, labelStyle]}>{label}</Text>
                 </View>
             )}

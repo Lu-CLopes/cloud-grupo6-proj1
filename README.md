@@ -58,7 +58,37 @@ personal_records (id, user_id, exercise_name, best_weight, achieved_at)
 - **Cliente:** Aplicativo mobile em React Native + Expo
 - **Controle de versão:** Git/GitHub (repositório compartilhado do grupo)
 
-## 7. Equipe
+## 7. App Mobile (Expo)
+
+O cliente (`mobile-app/`) é um app Expo/React Native que consome a API através do gateway (VM1). Ele não faz parte do `vagrant up` — roda na máquina do desenvolvedor (ou em um celular via Expo Go), fora das VMs. Isso é proposital: o `vagrant up` sozinho precisa terminar e deixar a infraestrutura completa rodando (é isso que é avaliado), sem depender de Node/Expo estarem instalados em quem for rodar o `vagrant up`.
+
+### Como rodar
+
+Opção rápida (sobe as VMs e já inicia o Expo em seguida, um único comando):
+
+```bash
+./dev-up.sh
+```
+
+Ou manualmente:
+
+```bash
+vagrant up          # se as VMs ainda não estiverem de pé
+cd mobile-app
+npm install
+npx expo start
+```
+
+Abre um QR code: escaneie com o app **Expo Go** (Android/iOS) no celular, ou pressione `a`/`i` no terminal para abrir num emulador Android/simulador iOS, ou `w` para rodar no navegador.
+
+### Conectando ao backend
+
+O app fala com a API sempre através do gateway (VM1), nunca direto com o app server (VM2) — ver `src/services/api/client.ts`. Para o app alcançar a VM a partir da máquina física, o `Vagrantfile` encaminha a porta `3000` da VM `frontend` para a porta `3000` do host (`vagrant up` precisa estar rodando).
+
+`client.ts` aponta para o IP do Mac na rede local (funciona pro simulador, emulador e celular físico via Expo Go, desde que todos estejam na mesma Wi-Fi). **Se você trocar de rede**, pegue o IP atual com `ipconfig getifaddr en0` e atualize a constante `HOST` em `mobile-app/src/services/api/client.ts`.
+| Celular físico (Expo Go) | `http://<IP da máquina na LAN>:3000/api` — edite `API_BASE_URL` em `client.ts` |
+
+## 8. Equipe
 
 Luiza Lopes 
 Maria Manzini

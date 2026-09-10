@@ -11,7 +11,7 @@ import * as SecureStore from 'expo-secure-store';
 // Usa o IP do Mac na LAN — funciona no simulador, no emulador e no
 // celular físico (Expo Go), desde que todos estejam na mesma Wi-Fi.
 // Se mudar de rede, atualize aqui (pegue o IP atual com `ipconfig getifaddr en0`).
-const HOST = '192.168.68.53';
+const HOST = '192.168.68.52';
 const API_BASE_URL = `http://${HOST}:3000/api`;
 
 const TOKEN_KEY = 'crossfit_auth_token';

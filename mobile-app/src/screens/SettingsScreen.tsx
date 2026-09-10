@@ -20,6 +20,8 @@ import {
     setOpenAIKey,
     getBarType,
 } from '../services/database/settings';
+import { logoutUser } from '../services/api/authApi';
+import { useAuthStore } from '../store/useAuthStore';
 
 import Card from '../components/Card';
 import TextInput from '../components/TextInput';
@@ -92,6 +94,20 @@ export default function SettingsScreen() {
         } finally {
             setSaving(false);
         }
+    }
+
+    function handleLogout() {
+        Alert.alert('Sair da conta', 'Tem certeza que quer sair?', [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+                text: 'Sair',
+                style: 'destructive',
+                onPress: async () => {
+                    await logoutUser();
+                    useAuthStore.getState().setUser(null);
+                },
+            },
+        ]);
     }
 
     function maskedKey(key: string): string {
@@ -265,6 +281,19 @@ export default function SettingsScreen() {
                     style={dynStyles.saveBtn}
                 />
 
+                {/* ── Conta ── */}
+                <SectionLabel title="Conta" colors={colors} />
+                <TouchableOpacity
+                    style={[dynStyles.logoutBtn, { borderColor: colors.error }]}
+                    onPress={handleLogout}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons name="log-out-outline" size={18} color={colors.error} />
+                    <Text style={[dynStyles.logoutText, { color: colors.error }]}>
+                        Sair da conta
+                    </Text>
+                </TouchableOpacity>
+
                 <View style={{ height: 60 }} />
             </ScrollView>
         </View>
@@ -415,6 +444,20 @@ function getDynStyles(colors: any) {
 
         saveBtn: {
             marginTop: spacing.lg,
+        },
+
+        logoutBtn: {
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: 8,
+            borderWidth: 1,
+            borderRadius: radius.lg,
+            paddingVertical: spacing.sm + 4,
+        },
+        logoutText: {
+            fontSize: 14,
+            fontWeight: '700',
         },
     });
 }

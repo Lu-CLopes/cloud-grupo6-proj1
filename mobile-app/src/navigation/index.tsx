@@ -23,12 +23,40 @@ import LoginScreen from '../screens/LoginScreen';
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createStackNavigator<RootStackParamList>();
 
+const TAB_ICONS: Record<
+    keyof MainTabParamList,
+    { active: React.ComponentProps<typeof Ionicons>['name']; inactive: React.ComponentProps<typeof Ionicons>['name'] }
+> = {
+    Dashboard: { active: 'home', inactive: 'home-outline' },
+    History: { active: 'time', inactive: 'time-outline' },
+    Calculator: { active: 'calculator', inactive: 'calculator-outline' },
+    Exercises: { active: 'barbell', inactive: 'barbell-outline' },
+};
+
 function MainTabs() {
     const { colors } = useTheme();
 
     return (
         <Tab.Navigator
-
+            screenOptions={({ route }) => ({
+                headerShown: false,
+                tabBarActiveTintColor: colors.orange,
+                tabBarInactiveTintColor: colors.textMuted,
+                tabBarStyle: {
+                    backgroundColor: colors.surface,
+                    borderTopColor: colors.border,
+                },
+                tabBarIcon: ({ focused, color, size }) => {
+                    const icon = TAB_ICONS[route.name as keyof MainTabParamList];
+                    return (
+                        <Ionicons
+                            name={focused ? icon.active : icon.inactive}
+                            size={size}
+                            color={color}
+                        />
+                    );
+                },
+            })}
         >
             <Tab.Screen
                 name="Dashboard"

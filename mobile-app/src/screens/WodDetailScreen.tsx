@@ -1,29 +1,25 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
     ScrollView,
     StyleSheet,
     Alert,
-    ActivityIndicator,
     TouchableOpacity,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useRoute, RouteProp } from '@react-navigation/native';
 
 import { colors, spacing } from '../theme';
-import { fetchWodById, deleteWod } from '../services/database/wod';
 import { analyzeWod } from '../services/api/openai';
-import { WodEntry } from '../store/useWodStore';
+import { useWodStore } from '../store/useWodStore';
 import { RootStackParamList } from '../navigation/types';
-import { formatDate } from '../utils/formatters';
+import { formatDate, toDateOnly } from '../utils/formatters';
 
 import Card from '../components/Card';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
 import ScreenHeader from '../components/ScreenHeader';
 
-type NavProp = StackNavigationProp<RootStackParamList>;
 type RoutePropT = RouteProp<RootStackParamList, 'WodDetail'>;
 
 const TYPE_COLORS: Record<string, string> = {
@@ -36,25 +32,16 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 export default function WodDetailScreen() {
-    const navigation = useNavigation<NavProp>();
     const route = useRoute<RoutePropT>();
     const { wodId } = route.params;
 
-    const [wod, setWod] = useState<WodEntry | null>(null);
+    // O WOD já foi carregado pela Dashboard/Histórico (via API) — só
+    // procuramos ele na store, sem precisar de outra chamada de rede.
+    const wod = useWodStore((s) => s.wods.find((w) => w.id === wodId)) ?? null;
     const [aiAnalysis, setAiAnalysis] = useState<string>('');
     const [aiLoading, setAiLoading] = useState(false);
-    const [loading, setLoading] = useState(true);
 
-    useEffect(() => { loadWod(); }, [wodId]);
-
-    async function loadWod() {
-        setLoading(true);
-        const data = await fetchWodById(wodId);
-        setWod(data);
-        setLoading(false);
-    }
-
-    async function handleDelete() {
+    function handleDelete() {
         Alert.alert(
             'Deletar WOD',
             `Tem certeza que quer deletar "${wod?.title}"?`,
@@ -63,9 +50,13 @@ export default function WodDetailScreen() {
                 {
                     text: 'Deletar',
                     style: 'destructive',
-                    onPress: async () => {
-                        await deleteWod(wodId);
-                        navigation.goBack();
+                    onPress: () => {
+                        // A exclusão de WOD não faz parte do escopo das 5
+                        // funcionalidades da API deste projeto (ver README).
+                        Alert.alert(
+                            'Indisponível',
+                            'A exclusão de WODs ainda não está implementada na API deste projeto.'
+                        );
                     },
                 },
             ]
@@ -91,14 +82,6 @@ export default function WodDetailScreen() {
         }
     }
 
-    if (loading) {
-        return (
-            <View style={styles.center}>
-                <ActivityIndicator color={colors.orange} size="large" />
-            </View>
-        );
-    }
-
     if (!wod) {
         return (
             <View style={styles.center}>
@@ -113,7 +96,7 @@ export default function WodDetailScreen() {
         <View style={styles.root}>
             <ScreenHeader
                 title={wod.title}
-                subtitle={formatDate(new Date(wod.date + 'T00:00:00'))}
+                subtitle={formatDate(new Date(toDateOnly(wod.date) + 'T00:00:00'))}
                 rightIcon="trash-outline"
                 onRightPress={handleDelete}
             />

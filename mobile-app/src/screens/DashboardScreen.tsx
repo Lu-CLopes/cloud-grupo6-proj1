@@ -16,21 +16,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { spacing, radius, shadow } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
 import { useAppStore } from '../store/useAppStore';
-import { useWodStore } from '../store/useWodStore';
-import { useExerciseStore } from '../store/useExerciseStore';
-import { formatDate, getGreeting, formatShortDate } from '../utils/formatters';
+import { useWodStore, WodEntry } from '../store/useWodStore';
+import { useExerciseStore, ExerciseEntry } from '../store/useExerciseStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { formatDate, getGreeting, formatShortDate, toDateOnly } from '../utils/formatters';
 import { RootStackParamList } from '../navigation/types';
 
-import {
-    fetchAllWods,
-    fetchTodayWod,
-    calculateStreak,
-    countWods,
-} from '../services/database/wod';
-import {
-    fetchRecentPRs,
-    countPRs,
-} from '../services/database/exercise';
+import { fetchHistory } from '../services/api/historyApi';
 
 import Card from '../components/Card';
 import Badge from '../components/Badge';
@@ -63,29 +55,32 @@ export default function DashboardScreen() {
     const { totalWods, currentStreak, totalPRs } = useAppStore();
     const { wods, todayWod } = useWodStore();
     const { recentPRs } = useExerciseStore();
+    const user = useAuthStore((s) => s.user);
 
     const [refreshing, setRefreshing] = React.useState(false);
 
     useFocusEffect(
-        useCallback(() => { loadData(); }, [])
+        useCallback(() => { loadData(); }, [user?.id])
     );
 
     async function loadData() {
+        if (!user) return;
         try {
-            const [allWods, today, streak, total, prs, prCount] = await Promise.all([
-                fetchAllWods(),
-                fetchTodayWod(),
-                calculateStreak(),
-                countWods(),
-                fetchRecentPRs(),
-                countPRs(),
-            ]);
+            const { wods: rawWods, exerciseEntries: rawEntries } = await fetchHistory(user.id);
+            const allWods = rawWods as WodEntry[];
+            const today = toDateOnly(new Date().toISOString());
+
             useWodStore.getState().setWods(allWods);
-            useWodStore.getState().setTodayWod(today);
-            useAppStore.getState().setCurrentStreak(streak);
-            useAppStore.getState().setTotalWods(total);
-            useExerciseStore.getState().setRecentPRs(prs);
-            useAppStore.getState().setTotalPRs(prCount);
+            useWodStore.getState().setTodayWod(
+                allWods.find((w) => toDateOnly(w.date) === today) ?? null
+            );
+            useAppStore.getState().setTotalWods(allWods.length);
+            useAppStore.getState().setCurrentStreak(calculateStreakFromWods(allWods));
+
+            const entries = rawEntries.map(toExerciseEntry);
+            const prs = entries.filter((e) => e.isPR);
+            useExerciseStore.getState().setRecentPRs(prs.slice(0, 10));
+            useAppStore.getState().setTotalPRs(prs.length);
         } catch (e) {
             console.error('Erro ao carregar dashboard:', e);
         }
@@ -407,6 +402,54 @@ export default function DashboardScreen() {
             </LinearGradient>
         </View>
     );
+}
+
+// ── Helpers de dados vindos da API ──────────────────────────────
+
+// A API retorna as linhas de exercise_entries em snake_case (ver
+// app-server/models/exerciseEntryModel.js), diferente do formato
+// usado no resto do app mobile.
+function toExerciseEntry(row: any): ExerciseEntry {
+    return {
+        id: row.id,
+        name: row.exercise_name,
+        weight: row.weight,
+        reps: row.reps ?? undefined,
+        date: row.date,
+        isPR: !!row.is_pr,
+        notes: row.notes ?? undefined,
+    };
+}
+
+// Conta quantos dias consecutivos (até hoje) têm pelo menos 1 WOD,
+// a partir da lista de WODs já carregada (evita outra chamada à API).
+function calculateStreakFromWods(wods: WodEntry[]): number {
+    const uniqueDates = Array.from(
+        new Set(wods.map((w) => toDateOnly(w.date)))
+    ).sort((a, b) => (a < b ? 1 : -1));
+
+    if (uniqueDates.length === 0) return 0;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let streak = 0;
+    for (let i = 0; i < uniqueDates.length; i++) {
+        const wodDate = new Date(uniqueDates[i] + 'T00:00:00');
+        const diffDays = Math.round(
+            (today.getTime() - wodDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        if (i === 0 && diffDays > 1) return 0;
+
+        if (diffDays === i) {
+            streak++;
+        } else {
+            break;
+        }
+    }
+
+    return streak;
 }
 
 // ── Componentes locais ───────────────────────────────────────────

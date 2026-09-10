@@ -17,7 +17,7 @@ import { fetchHistory } from '../services/api/historyApi';
 import { useWodStore, WodEntry } from '../store/useWodStore';
 import { useAppStore } from '../store/useAppStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { formatShortDate } from '../utils/formatters';
+import { formatShortDate, toDateOnly } from '../utils/formatters';
 import { RootStackParamList } from '../navigation/types';
 
 import Card from '../components/Card';
@@ -203,7 +203,7 @@ export default function HistoryScreen() {
 
 function groupByMonth(wods: WodEntry[]): Record<string, WodEntry[]> {
     return wods.reduce((groups, wod) => {
-        const date = new Date(wod.date + 'T00:00:00');
+        const date = new Date(toDateOnly(wod.date) + 'T00:00:00');
         const month = date.toLocaleDateString('pt-BR', {
             month: 'long',
             year: 'numeric',

@@ -15,6 +15,12 @@ export function formatShortDate(dateStr: string): string {
     });
 }
 
+// A API retorna colunas DATE do MySQL como string ISO completa
+// (ex: "2026-09-09T00:00:00.000Z"). Usar isso pra extrair só "YYYY-MM-DD".
+export function toDateOnly(value: string): string {
+    return String(value).slice(0, 10);
+}
+
 export function getGreeting(): string {
     const hour = new Date().getHours();
     if (hour < 12) return 'Bom dia';

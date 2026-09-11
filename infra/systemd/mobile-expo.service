@@ -1,0 +1,15 @@
+[Unit]
+Description=CrossFit Tracker - Mobile App Dev Server (Expo/Metro) (VM frontend)
+After=network.target frontend-gateway.service
+
+[Service]
+Type=simple
+WorkingDirectory=/vagrant/mobile-app
+EnvironmentFile=/etc/mobile-expo.env
+ExecStart=/usr/bin/npx expo start --lan
+Restart=on-failure
+RestartSec=5
+User=vagrant
+
+[Install]
+WantedBy=multi-user.target

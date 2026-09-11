@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -11,6 +11,7 @@ import {
 
 import { colors, spacing } from '../theme';
 import { loginUser, registerUser } from '../services/api/authApi';
+import { getApiHost, setApiHost, getSuggestedHost } from '../services/api/client';
 import { useAuthStore } from '../store/useAuthStore';
 
 import Button from '../components/Button';
@@ -25,6 +26,36 @@ export default function LoginScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // Configuração do servidor precisa estar acessível aqui: login/cadastro
+    // já dependem dela, e a tela de Configurações só existe depois de logado.
+    const [serverHost, setServerHost] = useState('');
+    const [showServerConfig, setShowServerConfig] = useState(false);
+
+    useEffect(() => {
+        getApiHost().then(setServerHost);
+    }, []);
+
+    async function handleSaveHost() {
+        if (!serverHost.trim()) {
+            Alert.alert('Endereço obrigatório', 'Informe o IP do servidor pra continuar.');
+            return;
+        }
+        await setApiHost(serverHost);
+        setShowServerConfig(false);
+    }
+
+    function handleDetectHost() {
+        const suggested = getSuggestedHost();
+        if (!suggested) {
+            Alert.alert(
+                'Não foi possível detectar',
+                'Digite o IP manualmente (pegue com `ipconfig getifaddr en0` na máquina que roda o `vagrant up`).'
+            );
+            return;
+        }
+        setServerHost(suggested);
+    }
 
     const isRegister = mode === 'register';
     const isValid =
@@ -120,6 +151,33 @@ export default function LoginScreen() {
                         ? 'Já tem conta? Entrar'
                         : 'Ainda não tem conta? Criar agora'}
                 </Text>
+
+                <Text
+                    style={styles.serverToggle}
+                    onPress={() => setShowServerConfig((v) => !v)}
+                >
+                    {serverHost ? `⚙ Servidor: ${serverHost}` : '⚙ Configurar servidor'}
+                </Text>
+
+                {showServerConfig && (
+                    <Card style={styles.card}>
+                        <TextInput
+                            label="Endereço do servidor"
+                            value={serverHost}
+                            onChangeText={setServerHost}
+                            placeholder="192.168.0.10"
+                            autoCapitalize="none"
+                            keyboardType="numbers-and-punctuation"
+                            hint="IP da máquina rodando o vagrant up, mesma Wi-Fi do celular"
+                        />
+                        <Button
+                            label="Detectar automaticamente"
+                            variant="secondary"
+                            onPress={handleDetectHost}
+                        />
+                        <Button label="Salvar endereço" emoji="💾" onPress={handleSaveHost} />
+                    </Card>
+                )}
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -156,5 +214,11 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: colors.info,
         fontWeight: '600',
+    },
+    serverToggle: {
+        marginTop: spacing.xl,
+        textAlign: 'center',
+        color: colors.textMuted,
+        fontSize: 12,
     },
 });

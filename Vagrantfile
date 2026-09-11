@@ -1,3 +1,18 @@
+require 'socket'
+
+# Detecta o IP da máquina física na rede local. Roda no HOST 
+def detect_host_lan_ip
+	socket = UDPSocket.new
+	socket.connect("8.8.8.8", 53)
+	ip = socket.local_address.ip_address
+	socket.close
+	ip
+rescue StandardError
+	"127.0.0.1"
+end
+
+HOST_LAN_IP = detect_host_lan_ip
+
 Vagrant.configure("2") do |config|
 	is_arm = RUBY_PLATFORM.include?("arm64") || RUBY_PLATFORM.include?("aarch64")
 
@@ -9,9 +24,10 @@ Vagrant.configure("2") do |config|
 		client.vm.hostname = "frontend"
 		#client.vm.network "forwarded_port", guest: 22, host: "2232"
 		client.vm.network "private_network", ip: "10.20.30.1",netmask: "255.255.255.0", virtualbox__intnet: "intnet1"
-		# Expoe o gateway (VM1) para a maquina fisica, pra o app mobile (Expo)
-		# conseguir alcancar a API durante o desenvolvimento/teste.
+		# Expoe o gateway (VM1) para a maquina fisica, pra o app mobile (Expo) conseguir alcancar a API durante o desenvolvimento/teste.
 		client.vm.network "forwarded_port", guest: 3000, host: 3000
+		# Expoe o Metro pro celular conseguir baixar o app e conectar no live-reload.
+		client.vm.network "forwarded_port", guest: 8081, host: 8081
 		client.vm.provider "virtualbox" do |vb|
 			#vb.customize ["modifyvm", :id, "--appendconfig", "nopti nospectre_v2 nospectre_v1 irqpoll"] if !is_arm
 			#vb.customize ["storagectl", :id, "--name", "SATA Controller", "--hostiocache", "on"] if !is_arm
@@ -22,7 +38,7 @@ Vagrant.configure("2") do |config|
 			vb.cpus = 1
 			vb.name = "frontend"
 			end
-		client.vm.provision "shell", inline: <<-SHELL
+		client.vm.provision "shell", env: { "HOST_LAN_IP" => HOST_LAN_IP }, inline: <<-SHELL
 			sudo apt-get -y update
 			sudo apt-get -y install net-tools
 
@@ -39,7 +55,7 @@ Vagrant.configure("2") do |config|
             echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
             sudo DEBIAN_FRONTEND=noninteractive apt-get -y install iptables-persistent
 
-			# Node.js (usado pelo gateway)
+			# Node.js (usado pelo gateway e pelo app mobile/Expo)
 			sudo apt-get -y install curl
 			curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 			sudo apt-get -y install nodejs
@@ -48,7 +64,7 @@ Vagrant.configure("2") do |config|
 			# Instala as dependências do gateway a partir da pasta sincronizada
 			cd /vagrant/frontend-gateway && npm install
 
-			# Garante que existe um .env 
+			# Garante que existe um .env
 			[ -f /vagrant/frontend-gateway/.env ] || cp /vagrant/frontend-gateway/.env.example /vagrant/frontend-gateway/.env
 
 			# Sobe o gateway como serviço, pra já ficar rodando após o "vagrant up"
@@ -56,6 +72,22 @@ Vagrant.configure("2") do |config|
 			sudo systemctl daemon-reload
 			sudo systemctl enable frontend-gateway
 			sudo systemctl restart frontend-gateway
+
+			# Instala as dependências do app mobile a partir da pasta sincronizada
+			cd /vagrant/mobile-app && npm install
+
+			# O Metro (bundler do Expo) roda aqui dentro da VM
+			sudo tee /etc/mobile-expo.env > /dev/null <<-ENVFILE
+			REACT_NATIVE_PACKAGER_HOSTNAME=$HOST_LAN_IP
+			EXPO_NO_TELEMETRY=1
+			EXPO_UNSTABLE_HEADLESS=1
+			ENVFILE
+
+			# Sobe o Expo/Metro como serviço, pra já ficar rodando após o "vagrant up"
+			sudo cp /vagrant/infra/systemd/mobile-expo.service /etc/systemd/system/mobile-expo.service
+			sudo systemctl daemon-reload
+			sudo systemctl enable mobile-expo
+			sudo systemctl restart mobile-expo
 		SHELL
 	end
 	

@@ -2,17 +2,50 @@
 // Todas as chamadas passam pela VM1 (Front-End Gateway), nunca direto
 // pra VM2 — quem decide pra onde encaminhar é a própria VM1.
 
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 
 // A rede interna das VMs (intnet1, 10.20.30.0/24) não é alcançável direto
 // do host/celular. O Vagrantfile encaminha a porta 3000 da VM frontend
-// (gateway) para a porta 3000 da máquina física rodando o `vagrant up`.
+// (gateway) para a porta 3000 de quem rodou o `vagrant up`.
 //
-// Usa o IP do Mac na LAN — funciona no simulador, no emulador e no
-// celular físico (Expo Go), desde que todos estejam na mesma Wi-Fi.
-// Se mudar de rede, atualize aqui (pegue o IP atual com `ipconfig getifaddr en0`).
-const HOST = '192.168.68.52';
-const API_BASE_URL = `http://${HOST}:3000/api`;
+// O host do gateway não pode ser fixo no código: cada pessoa do grupo
+// roda isso em uma rede/notebook diferente. Ele é configurável em
+// Configurações > Conexão e fica salvo no dispositivo — o único
+// requisito real é celular e host estarem na mesma rede local. Como
+// sugestão inicial (não como valor definitivo), tentamos adivinhar via
+// hostUri do Expo, que é o host que serviu o Metro pro celular — só
+// funciona quando quem roda `expo start` é a mesma máquina do `vagrant up`.
+const HOST_KEY = 'crossfit_api_host';
+
+function detectHost(): string | null {
+  const hostUri =
+    Constants.expoConfig?.hostUri ?? (Constants as any).expoGoConfig?.debuggerHost;
+  return hostUri ? hostUri.split(':')[0] : null;
+}
+
+export function getSuggestedHost(): string {
+  return detectHost() ?? '';
+}
+
+export async function getApiHost(): Promise<string> {
+  const saved = await SecureStore.getItemAsync(HOST_KEY);
+  return saved || getSuggestedHost();
+}
+
+export async function setApiHost(host: string): Promise<void> {
+  await SecureStore.setItemAsync(HOST_KEY, host.trim());
+}
+
+async function getApiBaseUrl(): Promise<string> {
+  const host = await getApiHost();
+  if (!host) {
+    throw new Error(
+      'Endereço do servidor não configurado. Defina o IP em Configurações > Conexão.'
+    );
+  }
+  return `http://${host}:3000/api`;
+}
 
 const TOKEN_KEY = 'crossfit_auth_token';
 
@@ -45,7 +78,8 @@ export async function apiRequest<T>(
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const baseUrl = await getApiBaseUrl();
+  const response = await fetch(`${baseUrl}${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,

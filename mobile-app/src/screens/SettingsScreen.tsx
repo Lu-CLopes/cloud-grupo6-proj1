@@ -21,6 +21,7 @@ import {
     getBarType,
 } from '../services/database/settings';
 import { logoutUser } from '../services/api/authApi';
+import { getApiHost, setApiHost, getSuggestedHost } from '../services/api/client';
 import { useAuthStore } from '../store/useAuthStore';
 
 import Card from '../components/Card';
@@ -68,23 +69,35 @@ export default function SettingsScreen() {
 
     const [openaiKey, setOpenaiKey] = useState('');
     const [barType, setBarTypeState] = useState('male');
+    const [serverHost, setServerHost] = useState('');
     const [saving, setSaving] = useState(false);
     const [keyVisible, setKeyVisible] = useState(false);
 
     useEffect(() => { loadSettings(); }, []);
 
     async function loadSettings() {
-        const [key, bar] = await Promise.all([getOpenAIKey(), getBarType()]);
+        const [key, bar, host] = await Promise.all([
+            getOpenAIKey(),
+            getBarType(),
+            getApiHost(),
+        ]);
         setOpenaiKey(key);
         setBarTypeState(bar);
+        setServerHost(host);
     }
 
     async function handleSave() {
+        if (!serverHost.trim()) {
+            Alert.alert('Endereço obrigatório', 'Informe o IP do servidor pra continuar.');
+            return;
+        }
+
         setSaving(true);
         try {
             await Promise.all([
                 setOpenAIKey(openaiKey.trim()),
                 setSetting('bar_type', barType),
+                setApiHost(serverHost),
             ]);
             Alert.alert('Configurações salvas!', '', [
                 { text: 'OK', onPress: () => navigation.goBack() },
@@ -94,6 +107,18 @@ export default function SettingsScreen() {
         } finally {
             setSaving(false);
         }
+    }
+
+    function handleDetectHost() {
+        const suggested = getSuggestedHost();
+        if (!suggested) {
+            Alert.alert(
+                'Não foi possível detectar',
+                'Não achamos um IP automaticamente. Digite o IP do servidor manualmente (pegue com `ipconfig getifaddr en0` na máquina que roda o `vagrant up`).'
+            );
+            return;
+        }
+        setServerHost(suggested);
     }
 
     function handleLogout() {
@@ -178,6 +203,37 @@ export default function SettingsScreen() {
                         );
                     })}
                 </View>
+
+                {/* ── Conexão ── */}
+                <SectionLabel title="Conexão" colors={colors} />
+                <Card>
+                    <Text style={dynStyles.settingDesc}>
+                        IP do servidor (VM frontend) na rede local. Precisa estar
+                        na mesma Wi-Fi de quem rodou o `vagrant up`.
+                    </Text>
+                    <View style={dynStyles.keyRow}>
+                        <View style={{ flex: 1 }}>
+                            <TextInput
+                                label="Endereço do servidor"
+                                value={serverHost}
+                                onChangeText={setServerHost}
+                                placeholder="192.168.0.10"
+                                autoCapitalize="none"
+                                keyboardType="numbers-and-punctuation"
+                            />
+                        </View>
+                        <TouchableOpacity
+                            style={dynStyles.eyeBtn}
+                            onPress={handleDetectHost}
+                        >
+                            <Ionicons
+                                name="locate-outline"
+                                size={20}
+                                color={colors.textSecondary}
+                            />
+                        </TouchableOpacity>
+                    </View>
+                </Card>
 
                 {/* ── OpenAI ── */}
                 <SectionLabel title="Inteligência Artificial" colors={colors} />

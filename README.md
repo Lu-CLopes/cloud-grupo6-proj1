@@ -60,33 +60,35 @@ personal_records (id, user_id, exercise_name, best_weight, achieved_at)
 
 ## 7. App Mobile (Expo)
 
-O cliente (`mobile-app/`) é um app Expo/React Native que consome a API através do gateway (VM1). Ele não faz parte do `vagrant up` — roda na máquina do desenvolvedor (ou em um celular via Expo Go), fora das VMs. Isso é proposital: o `vagrant up` sozinho precisa terminar e deixar a infraestrutura completa rodando (é isso que é avaliado), sem depender de Node/Expo estarem instalados em quem for rodar o `vagrant up`.
+O cliente (`mobile-app/`) é um app Expo/React Native que consome a API através do gateway (VM1). O `vagrant up` sozinho já deixa tudo rodando, incluindo o Expo: a VM `frontend` instala Node/Expo e sobe o Metro (bundler) como serviço systemd (`mobile-expo`), do mesmo jeito que já faz com o gateway. Quem roda `vagrant up` não precisa ter Node/Expo instalados — só Vagrant + VirtualBox, como já era o objetivo original.
 
 ### Como rodar
 
-Opção rápida (sobe as VMs e já inicia o Expo em seguida, um único comando):
+```bash
+vagrant up
+```
+
+Isso já sobe as 3 VMs **e** o Metro dentro da VM `frontend`. Pra pegar a URL de conexão (o Metro roda sem terminal interativo dentro da VM, então não tem QR code pra escanear direto):
+
+```bash
+vagrant ssh frontend -c "sudo journalctl -u mobile-expo -n 50"
+```
+
+Procure a linha com `exp://<ip>:8081` e digite esse endereço no Expo Go via "Enter URL manually" (ou escaneie o QR se preferir gerar um a partir dessa URL).
+
+Alternativa pra desenvolvimento ativo (recomendada no dia a dia): rodar o Expo direto na sua máquina em vez de depender do que está na VM — dá terminal interativo (QR code, atalhos `a`/`i`/`w`, simulador/emulador) e não depende da pasta compartilhada do Vagrant propagar as mudanças de arquivo em tempo real (o que a VM sozinha não garante bem). Pra isso:
 
 ```bash
 ./dev-up.sh
 ```
 
-Ou manualmente:
-
-```bash
-vagrant up          # se as VMs ainda não estiverem de pé
-cd mobile-app
-npm install
-npx expo start
-```
-
-Abre um QR code: escaneie com o app **Expo Go** (Android/iOS) no celular, ou pressione `a`/`i` no terminal para abrir num emulador Android/simulador iOS, ou `w` para rodar no navegador.
+ou manualmente `cd mobile-app && npm install && npx expo start`.
 
 ### Conectando ao backend
 
-O app fala com a API sempre através do gateway (VM1), nunca direto com o app server (VM2) — ver `src/services/api/client.ts`. Para o app alcançar a VM a partir da máquina física, o `Vagrantfile` encaminha a porta `3000` da VM `frontend` para a porta `3000` do host (`vagrant up` precisa estar rodando).
+O app fala com a API sempre através do gateway (VM1), nunca direto com o app server (VM2) — ver `src/services/api/client.ts`. O `Vagrantfile` encaminha as portas `3000` (API/gateway) e `8081` (Metro) da VM `frontend` para as mesmas portas do host físico.
 
-`client.ts` aponta para o IP do Mac na rede local (funciona pro simulador, emulador e celular físico via Expo Go, desde que todos estejam na mesma Wi-Fi). **Se você trocar de rede**, pegue o IP atual com `ipconfig getifaddr en0` e atualize a constante `HOST` em `mobile-app/src/services/api/client.ts`.
-| Celular físico (Expo Go) | `http://<IP da máquina na LAN>:3000/api` — edite `API_BASE_URL` em `client.ts` |
+O IP do servidor é configurável dentro do app (tela de Login ou Configurações > Conexão), salvo no dispositivo — não é mais fixo no código. Por padrão o app tenta detectar automaticamente via `Constants.expoConfig.hostUri` (o mesmo host que serviu o Metro pro celular); se precisar, dá pra digitar manualmente. O `Vagrantfile` também detecta o IP da máquina física sozinho (função `detect_host_lan_ip`, roda no host) e configura o Metro pra anunciar esse IP corretamente no manifest — não precisa editar nada à mão pra isso funcionar em outro notebook/rede.
 
 ## 8. Equipe
 
